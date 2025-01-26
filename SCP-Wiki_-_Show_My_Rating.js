@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name         SCP Wiki Show My Rating
+// @name         SCP Wiki - Show My Rating
 // @namespace    https://example.com
 // @version      1.0
 // @description  Displays your rating of an SCP-Wiki page
