@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SCP Wiki - Show My Rating
 // @namespace    https://example.com
-// @version      1.0
+// @version      2.0
 // @description  Displays your rating of an SCP-Wiki page
 // @match        https://scp-wiki.wikidot.com/*
 // @grant        none
@@ -15,27 +15,25 @@
     let ratingDisplay;
 
     /**
-     * Create (once) or update the display in #page-title (right side).
+     * Create (once) or update the display in in the first page-rate widget
      */
     function updateDisplay(message) {
         if (!ratingDisplay) {
-            ratingDisplay = document.createElement('div');
+            ratingDisplay = document.createElement('span');
             ratingDisplay.id = 'my-user-rating-display';
-            ratingDisplay.style.float = 'right';
-            ratingDisplay.style.marginLeft = 'auto';
-            ratingDisplay.style.padding = '6px';
-            ratingDisplay.style.backgroundColor = '#f8f8f8';
-            ratingDisplay.style.fontSize = '60%';
+            ratingDisplay.style.marginRight = '5px';
+            ratingDisplay.style.borderRadius = '5px';
+            ratingDisplay.classList.add('rate-points');
         }
         ratingDisplay.textContent = message;
 
-        const pageTitle = document.querySelector('#page-title');
-        if (pageTitle) {
-            if (!pageTitle.contains(ratingDisplay)) {
-                pageTitle.appendChild(ratingDisplay);
+        const rateWidget = document.querySelector('.page-rate-widget-box');
+        if (rateWidget) {
+            if (!rateWidget.contains(ratingDisplay)) {
+                rateWidget.insertBefore(ratingDisplay, rateWidget.firstChild);
             }
         } else {
-            console.log('[SCP Auto-Check My Rating] #page-title not found. Cannot place display in title.');
+            console.log('[SCP Auto-Check My Rating] .page-rate-widget-box not found. Cannot place rating display');
         }
     }
 
@@ -62,80 +60,67 @@
         console.log('[SCP Auto-Check My Rating] Detected username =', myUsername);
 
         updateDisplay('Checking your rating automatically...');
-        autoClickRating();
+
+        fetchWhoRatedDirectly();
     });
 
-    // 1) Click the "Rate" button to open the rating widget
-    function autoClickRating() {
-        const rateButton = document.querySelector('#pagerate-button');
-        if (!rateButton) {
-            console.log('[SCP Auto-Check My Rating] Rate button not found. Exiting.');
-            updateDisplay('Rate button not found');
+
+    // Fetch "who rated" data from the server
+    function fetchWhoRatedDirectly() {
+		// Grab the pageId from the global WIKIREQUEST object (if it exists)
+		if (!window.WIKIREQUEST || !window.WIKIREQUEST.info || !window.WIKIREQUEST.info.pageId) {
+			console.log('[Direct SCP Rating Fetch] Could not find WIKIREQUEST.info.pageId. Exiting.');
+			return;
+		}
+		const pageId = window.WIKIREQUEST.info.pageId;
+		console.log('[SCP Auto-Check My Rating] pageId =', pageId);
+
+        // retrieve the wikidot_token7 from cookies
+        const wikiToken = getCookieValue('wikidot_token7');
+        if (!wikiToken) {
+            console.log('[SCP Auto-Check My Rating] No wikidot_token7 cookie found, cannot fetch "who rated".');
+            updateDisplay('No wikidot_token7 cookie found.');
             return;
         }
 
-        console.log('[SCP Auto-Check My Rating] Found Rate button, clicking...');
-        rateButton.click();
+        // build the POST data, including moduleName in the body
+        const postData = new URLSearchParams({
+            moduleName: 'pagerate/WhoRatedPageModule',
+            pageId: pageId,
+            wikidot_token7: wikiToken
+        });
 
-        // small delay to let the widget appear
-        setTimeout(() => {
-            const actionArea = document.querySelector('#action-area');
-            if (!actionArea || actionArea.style.display === 'none') {
-                console.log('[SCP Auto-Check My Rating] Rating widget not open. Exiting.');
-                updateDisplay('Rating widget did not open. Could not check rating.');
+        fetch('/ajax-module-connector.php', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
+            },
+            body: postData.toString()
+        })
+        .then(response => response.json())
+        .then(json => {
+            if (json.status !== 'ok' || !json.body) {
+                console.log('[SCP Auto-Check My Rating] Response not OK or missing body:', json);
+                updateDisplay('Could not load who-rated data.');
                 return;
             }
-            console.log('[SCP Auto-Check My Rating] Rating widget is visible. Clicking "Look who rated"...');
-            autoClickShowWho();
-        }, 500);
+
+            // parse the returned HTML to find user's rating
+            parseUserRatingFromHTML(json.body);
+        })
+        .catch(err => {
+            console.error('[SCP Auto-Check My Rating] Fetch error:', err);
+            updateDisplay('Error fetching who-rated data. See console.');
+        });
     }
 
-    // 2) Click "Look who rated"
-    function autoClickShowWho() {
-        const showWhoLink = [...document.querySelectorAll('#action-area a')]
-            .find(a => a.getAttribute('onclick') && a.getAttribute('onclick').includes('showWho'));
+    // Parse the returned HTML snippet, look for your username, update display
+    function parseUserRatingFromHTML(rawHtml) {
+        // create a temporary document from the returned HTML
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(rawHtml, 'text/html');
 
-        if (!showWhoLink) {
-            console.log('[SCP Auto-Check My Rating] Could not find "Look who rated this page" link.');
-            updateDisplay('No "Look who rated" link found.');
-            return;
-        }
-        console.log('[SCP Auto-Check My Rating] Found "Look who rated this page" link. Clicking it...');
-        showWhoLink.click();
-        console.log('[SCP Auto-Check My Rating] Clicked "Look who rated". Polling for user list...');
-        waitForWhoRatedToLoad();
-    }
-
-    // 3) Poll every second for who-rated-page-area to load, then parse
-    function waitForWhoRatedToLoad() {
-        let checks = 0;
-        const maxChecks = 20; // up to 20 seconds
-        const intervalId = setInterval(() => {
-            checks++;
-            console.log(`[SCP Auto-Check My Rating] Poll attempt #${checks}`);
-            const whoRatedContainer = document.querySelector('#who-rated-page-area');
-            if (whoRatedContainer && whoRatedContainer.children.length > 0) {
-                clearInterval(intervalId);
-                console.log('[SCP Auto-Check My Rating] who-rated-page-area is loaded. Parsing rating...');
-                parseUserRating();
-            } else if (checks >= maxChecks) {
-                clearInterval(intervalId);
-                console.log('[SCP Auto-Check My Rating] Timed out waiting for who-rated-page-area.');
-                updateDisplay('Could not load who-rated list in time.');
-            }
-        }, 1000);
-    }
-
-    // 4) Parse your rating, then click Rate again to close the overlay
-    function parseUserRating() {
-        const whoRatedContainer = document.querySelector('#who-rated-page-area');
-        if (!whoRatedContainer) {
-            console.log('[SCP Auto-Check My Rating] #who-rated-page-area not found.');
-            updateDisplay('Rating info not found. Cannot determine your rating.');
-            return;
-        }
-
-        const allUsers = whoRatedContainer.querySelectorAll('span.printuser.avatarhover');
+        const allUsers = doc.querySelectorAll('span.printuser.avatarhover');
         let myRating = null;
 
         for (const userSpan of allUsers) {
@@ -155,24 +140,24 @@
         }
 
         if (myRating === '+') {
-            updateDisplay('Your rating: + (upvote)');
+            updateDisplay('Your rating: + ');
             console.log('[SCP Auto-Check My Rating] User rated +.');
         } else if (myRating === '-') {
-            updateDisplay('Your rating: - (downvote)');
+            updateDisplay('Your rating: - ');
             console.log('[SCP Auto-Check My Rating] User rated -.');
         } else {
             updateDisplay('Your rating: Not rated');
-            console.log('[SCP Auto-Check My Rating] User did not rate or not found in list.');
+            console.log('[SCP Auto-Check My Rating] User not found or did not rate.');
         }
 
-        // 5) Re-click "Rate" to close the overlay, thus clearing the hourglass
-        setTimeout(() => {
-            console.log('[SCP Auto-Check My Rating] Closing the rating overlay...');
-            const rateButton = document.querySelector('#pagerate-button');
-            if (rateButton) {
-                rateButton.click();
-            }
-        }, 500);
+    }
+
+    // Helper: read a cookie by name
+    function getCookieValue(name) {
+        const matches = document.cookie.match(new RegExp(
+            '(?:^|; )' + name.replace(/([.$?*|{}\(\)\[\]\\\/\+^])/g, '\\$1') + '=([^;]*)'
+        ));
+        return matches ? decodeURIComponent(matches[1]) : null;
     }
 
 })();
