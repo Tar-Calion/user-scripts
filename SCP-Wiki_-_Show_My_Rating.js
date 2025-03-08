@@ -2,7 +2,7 @@
 // @name         SCP Wiki - Show My Rating
 // @namespace    https://example.com
 // @version      2.0
-// @description  Displays your rating of an SCP-Wiki page
+// @description  Displays your rating of an SCP-Wiki page, as well as the total number of positive and negative ratings.
 // @match        https://scp-wiki.wikidot.com/*
 // @grant        none
 // ==/UserScript==
@@ -50,7 +50,7 @@
                 voteCountSpan.className = 'vote-count';
                 rateUpButton.appendChild(voteCountSpan);
             }
-            voteCountSpan.textContent = ` (${positiveVotes})`;
+            voteCountSpan.textContent = `(${positiveVotes})`;
         }
 
         if (rateDownButton) {
@@ -60,7 +60,7 @@
                 voteCountSpan.className = 'vote-count';
                 rateDownButton.appendChild(voteCountSpan);
             }
-            voteCountSpan.textContent = ` (${negativeVotes})`;
+            voteCountSpan.textContent = `(${negativeVotes})`;
         }
     }
 
