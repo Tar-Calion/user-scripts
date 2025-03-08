@@ -14,6 +14,8 @@
 
     let ratingDisplay;
 
+    let myRating = null;
+
     /**
      * Create (once) or update the display in in the first page-rate widget
      */
@@ -119,12 +121,12 @@
 
     // Parse the returned HTML snippet, look for your username, update display
     function parseUserRatingFromHTML(rawHtml) {
+        myRating = null; // reset the rating
         // create a temporary document from the returned HTML
         const parser = new DOMParser();
         const doc = parser.parseFromString(rawHtml, 'text/html');
 
         const allUsers = doc.querySelectorAll('span.printuser.avatarhover');
-        let myRating = null;
 
         for (const userSpan of allUsers) {
             if (userSpan.textContent.includes(myUsername)) {
@@ -171,18 +173,23 @@
 
         if (rateUpButton) {
             rateUpButton.addEventListener('click', function() {
-                setTimeout(fetchWhoRated, 1000); // Delay to allow the rating action to complete
+                updateDisplay('Updating your rating...');
+                const delay = myRating === '-' ? 5000 : 1000;
+                setTimeout(fetchWhoRated, delay); // Delay to allow the rating action to complete
             });
         }
 
         if (rateDownButton) {
             rateDownButton.addEventListener('click', function() {
-                setTimeout(fetchWhoRated, 1000); // Delay to allow the rating action to complete
+                updateDisplay('Updating your rating...');
+                const delay = myRating === '+' ? 5000 : 1000;
+                setTimeout(fetchWhoRated, delay); // Delay to allow the rating action to complete
             });
         }
 
         if (cancelVoteButton) {
             cancelVoteButton.addEventListener('click', function() {
+                updateDisplay('Updating your rating...');
                 setTimeout(fetchWhoRated, 1000); // Delay to allow the rating action to complete
             });
         }
