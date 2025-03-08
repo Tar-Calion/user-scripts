@@ -61,12 +61,12 @@
 
         updateDisplay('Checking your rating...');
 
-        fetchWhoRatedDirectly();
+        fetchWhoRated();
     });
 
 
     // Fetch "who rated" data from the server
-    function fetchWhoRatedDirectly() {
+    function fetchWhoRated() {
 		// Grab the pageId from the global WIKIREQUEST object (if it exists)
 		if (!window.WIKIREQUEST || !window.WIKIREQUEST.info || !window.WIKIREQUEST.info.pageId) {
 			console.log('[Direct SCP Rating Fetch] Could not find WIKIREQUEST.info.pageId. Exiting.');
