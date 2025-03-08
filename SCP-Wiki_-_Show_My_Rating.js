@@ -151,7 +151,7 @@
         const parser = new DOMParser();
         const doc = parser.parseFromString(rawHtml, 'text/html');
 
-        const allUsers = doc.querySelectorAll('span.printuser.avatarhover');
+        const allUsers = doc.querySelectorAll('span.printuser');
         let positiveVotes = 0;
         let negativeVotes = 0;
 
