@@ -62,6 +62,9 @@
         updateDisplay('Checking your rating...');
 
         fetchWhoRated();
+
+        // Add event listeners to the rate buttons
+        addRateButtonListeners();
     });
 
 
@@ -158,6 +161,31 @@
             '(?:^|; )' + name.replace(/([.$?*|{}\(\)\[\]\\\/\+^])/g, '\\$1') + '=([^;]*)'
         ));
         return matches ? decodeURIComponent(matches[1]) : null;
+    }
+
+    // Add event listeners to the rate buttons
+    function addRateButtonListeners() {
+        const rateUpButton = document.querySelector('.rateup a');
+        const rateDownButton = document.querySelector('.ratedown a');
+        const cancelVoteButton = document.querySelector('.cancel a');
+
+        if (rateUpButton) {
+            rateUpButton.addEventListener('click', function() {
+                setTimeout(fetchWhoRated, 1000); // Delay to allow the rating action to complete
+            });
+        }
+
+        if (rateDownButton) {
+            rateDownButton.addEventListener('click', function() {
+                setTimeout(fetchWhoRated, 1000); // Delay to allow the rating action to complete
+            });
+        }
+
+        if (cancelVoteButton) {
+            cancelVoteButton.addEventListener('click', function() {
+                setTimeout(fetchWhoRated, 1000); // Delay to allow the rating action to complete
+            });
+        }
     }
 
 })();
