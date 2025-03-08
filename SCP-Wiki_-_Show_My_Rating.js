@@ -59,7 +59,7 @@
 
         console.log('[SCP Auto-Check My Rating] Detected username =', myUsername);
 
-        updateDisplay('Checking your rating automatically...');
+        updateDisplay('Checking your rating...');
 
         fetchWhoRatedDirectly();
     });
@@ -146,7 +146,7 @@
             updateDisplay('Your rating: - ');
             console.log('[SCP Auto-Check My Rating] User rated -.');
         } else {
-            updateDisplay('Your rating: Not rated');
+            updateDisplay('You have not rated this page');
             console.log('[SCP Auto-Check My Rating] User not found or did not rate.');
         }
 
