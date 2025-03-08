@@ -39,6 +39,31 @@
         }
     }
 
+    function updateVoteCounts(positiveVotes, negativeVotes) {
+        const rateUpButton = document.querySelector('.rateup');
+        const rateDownButton = document.querySelector('.ratedown');
+
+        if (rateUpButton) {
+            let voteCountSpan = rateUpButton.querySelector('.vote-count');
+            if (!voteCountSpan) {
+                voteCountSpan = document.createElement('span');
+                voteCountSpan.className = 'vote-count';
+                rateUpButton.appendChild(voteCountSpan);
+            }
+            voteCountSpan.textContent = ` (${positiveVotes})`;
+        }
+
+        if (rateDownButton) {
+            let voteCountSpan = rateDownButton.querySelector('.vote-count');
+            if (!voteCountSpan) {
+                voteCountSpan = document.createElement('span');
+                voteCountSpan.className = 'vote-count';
+                rateDownButton.appendChild(voteCountSpan);
+            }
+            voteCountSpan.textContent = ` (${negativeVotes})`;
+        }
+    }
+
     // Start after window load
     window.addEventListener('load', function() {
         console.log('[SCP Auto-Check My Rating] Page loaded.');
@@ -127,22 +152,30 @@
         const doc = parser.parseFromString(rawHtml, 'text/html');
 
         const allUsers = doc.querySelectorAll('span.printuser.avatarhover');
+        let positiveVotes = 0;
+        let negativeVotes = 0;
 
         for (const userSpan of allUsers) {
-            if (userSpan.textContent.includes(myUsername)) {
-                console.log('[SCP Auto-Check My Rating] Found userSpan for:', myUsername);
-                const signSpan = userSpan.nextElementSibling; // may contain '+', '-'
-                if (signSpan) {
-                    const signText = signSpan.textContent.trim();
-                    if (signText === '+') {
-                        myRating = '+';
-                    } else if (signText === '-') {
-                        myRating = '-';
-                    }
+            const signSpan = userSpan.nextElementSibling; // may contain '+', '-'
+            if (signSpan) {
+                const signText = signSpan.textContent.trim();
+                if (signText === '+') {
+                    positiveVotes++;
+                } else if (signText === '-') {
+                    negativeVotes++;
                 }
-                break;
+
+                if (userSpan.textContent.includes(myUsername)) {
+                    console.log('[SCP Auto-Check My Rating] Found userSpan for:', myUsername);
+                    myRating = signText;
+                }
             }
         }
+
+        console.log(`[SCP Auto-Check My Rating] Total positive votes: ${positiveVotes}`);
+        console.log(`[SCP Auto-Check My Rating] Total negative votes: ${negativeVotes}`);
+
+        updateVoteCounts(positiveVotes, negativeVotes);
 
         if (myRating === '+') {
             updateDisplay('Your rating: + ');
