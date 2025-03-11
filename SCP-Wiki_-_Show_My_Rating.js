@@ -44,21 +44,25 @@
         const rateDownButton = document.querySelector('.ratedown');
 
         if (rateUpButton) {
-            let voteCountSpan = rateUpButton.querySelector('.vote-count');
-            if (!voteCountSpan) {
+            let voteCountSpan = rateUpButton.nextElementSibling;
+            if (!voteCountSpan || !voteCountSpan.classList.contains('vote-count')) {
                 voteCountSpan = document.createElement('span');
-                voteCountSpan.className = 'vote-count';
-                rateUpButton.appendChild(voteCountSpan);
+                voteCountSpan.className = 'vote-count rate-points';
+                voteCountSpan.style.borderRadius = 0;
+                voteCountSpan.style.padding = '0 2px 0 2px';
+                rateUpButton.parentNode.insertBefore(voteCountSpan, rateUpButton.nextSibling);
             }
             voteCountSpan.textContent = `(${positiveVotes})`;
         }
 
         if (rateDownButton) {
-            let voteCountSpan = rateDownButton.querySelector('.vote-count');
-            if (!voteCountSpan) {
+            let voteCountSpan = rateDownButton.nextElementSibling;
+            if (!voteCountSpan || !voteCountSpan.classList.contains('vote-count')) {
                 voteCountSpan = document.createElement('span');
-                voteCountSpan.className = 'vote-count';
-                rateDownButton.appendChild(voteCountSpan);
+                voteCountSpan.className = 'vote-count rate-points';
+                voteCountSpan.style.borderRadius = 0;
+                voteCountSpan.style.padding = '0 2px 0 2px';
+                rateDownButton.parentNode.insertBefore(voteCountSpan, rateDownButton.nextSibling);
             }
             voteCountSpan.textContent = `(${negativeVotes})`;
         }
