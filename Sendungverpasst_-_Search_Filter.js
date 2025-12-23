@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         Sendungverpasst.de - Search Filter 1.0
+// @name         Sendungverpasst.de - Search Filter 1.1
 // @namespace    https://example.com
-// @version      1.0
+// @version      1.1
 // @description  Adds a collapsible UI to filter search results by title prefixes and channels.
 // @match        https://www.sendungverpasst.de/search*
 // @grant        none
@@ -164,6 +164,19 @@
   margin-left: 8px;
   font-weight: 600;
 }
+.${CLASSNAMES.root} .sv-filter-tooltip {
+  position: fixed;
+    max-height: 280px;
+    overflow: auto;
+    background: white;
+    border: 1px solid rgba(0,0,0,0.12);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.16);
+    padding: 8px;
+    border-radius: 8px;
+    font-size: 12px;
+    z-index: 2147483648;
+    min-width: 200px;
+}
 `;
         document.head.appendChild(style);
     }
@@ -196,6 +209,7 @@
         const pill = document.createElement('span');
         pill.className = 'sv-filter-pill';
         pill.textContent = '0/0';
+        pill.title = '';
         summary.appendChild(pill);
 
         const body = document.createElement('div');
@@ -233,6 +247,13 @@
         status.className = 'sv-filter-status';
         status.textContent = 'Bereit.';
 
+        // tooltip element for listing hidden items
+        const tooltip = document.createElement('div');
+        tooltip.className = 'sv-filter-tooltip';
+        tooltip.style.display = 'none';
+        tooltip.setAttribute('aria-hidden', 'true');
+        document.body.appendChild(tooltip);
+
         body.appendChild(prefixesLabel);
         body.appendChild(prefixesTextarea);
         body.appendChild(channelsLabel);
@@ -250,18 +271,33 @@
             channels: parseList(channelsTextarea.value)
         });
 
-        const updateStatus = (filteredCount, totalCount) => {
+        const updateStatus = (filteredCount, totalCount, hiddenList) => {
             pill.textContent = `${filteredCount}/${totalCount}`;
             const pCount = parseList(prefixesTextarea.value).length;
             const cCount = parseList(channelsTextarea.value).length;
             status.textContent = `Ausgeblendet: ${filteredCount} von ${totalCount} (Präfixe: ${pCount}, Sender: ${cCount})`;
+
+            // update tooltip content (join with line breaks)
+            if (hiddenList && hiddenList.length > 0) {
+                pill.title = hiddenList.map(item => `${item.reason} ${item.title}`).join('\n');
+                tooltip.textContent = '';
+                for (const item of hiddenList) {
+                    const div = document.createElement('div');
+                    div.textContent = `${item.reason} ${item.title}`;
+                    tooltip.appendChild(div);
+                }
+            } else {
+                pill.title = '';
+                tooltip.textContent = '';
+                tooltip.style.display = 'none';
+            }
         };
 
         const applyFilters = () => {
             const filters = getCurrentFilters();
             saveSettings(prefixesTextarea.value, channelsTextarea.value, details.open);
             const counts = filterResults(filters);
-            updateStatus(counts.filtered, counts.total);
+            updateStatus(counts.filtered, counts.total, counts.hiddenTitles);
         };
 
         const applyFiltersDebounced = debounce(applyFilters, 200);
@@ -282,6 +318,25 @@
 
         // Initial apply
         setTimeout(applyFilters, 0);
+
+        // show tooltip on hover over pill
+        let tooltipTimeout;
+        pill.addEventListener('mouseenter', (e) => {
+            clearTimeout(tooltipTimeout);
+            if (!tooltip.children.length) return;
+            tooltip.style.display = 'block';
+            tooltip.setAttribute('aria-hidden', 'false');
+            // position tooltip under pill (fixed positioning)
+            const rect = pill.getBoundingClientRect();
+            tooltip.style.left = `${rect.left}px`;
+            tooltip.style.top = `${rect.bottom + 6}px`;
+        });
+        pill.addEventListener('mouseleave', () => {
+            tooltipTimeout = setTimeout(() => {
+                tooltip.style.display = 'none';
+                tooltip.setAttribute('aria-hidden', 'true');
+            }, 180);
+        });
 
         return { applyFilters, updateStatus };
     }
@@ -309,26 +364,29 @@
     function filterResults(filters) {
         const cards = Array.from(document.querySelectorAll(SELECTORS.resultCard));
         let filtered = 0;
+        const hiddenTitles = [];
 
         for (const card of cards) {
             const title = getTitleFromCard(card);
             const channel = getChannelFromCard(card);
 
-            const shouldHide =
-                (filters.prefixes.length > 0 && matchesAnyPrefix(title, filters.prefixes)) ||
-                (filters.channels.length > 0 && matchesAnyChannel(channel, filters.channels));
+            const matchesPrefix = filters.prefixes.length > 0 && matchesAnyPrefix(title, filters.prefixes);
+            const matchesChannel = filters.channels.length > 0 && matchesAnyChannel(channel, filters.channels);
+            const shouldHide = matchesPrefix || matchesChannel;
 
             if (shouldHide) {
                 if (!card.classList.contains(CLASSNAMES.hidden)) {
                     card.classList.add(CLASSNAMES.hidden);
                 }
                 filtered++;
+                const reason = matchesPrefix ? '(Präfix)' : '(Sender)';
+                hiddenTitles.push({ title: title || '(kein Titel)', reason });
             } else {
                 card.classList.remove(CLASSNAMES.hidden);
             }
         }
 
-        return { filtered, total: cards.length };
+        return { filtered, total: cards.length, hiddenTitles };
     }
 
     function installAutoReapply(panelApi) {
@@ -343,7 +401,7 @@
             };
             const counts = filterResults(filters);
             if (panelApi && panelApi.updateStatus) {
-                panelApi.updateStatus(counts.filtered, counts.total);
+                panelApi.updateStatus(counts.filtered, counts.total, counts.hiddenTitles);
             }
         };
 
