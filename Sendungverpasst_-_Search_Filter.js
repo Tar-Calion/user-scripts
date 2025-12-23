@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         Sendungverpasst.de - Search Filter 1.1
+// @name         Sendungverpasst.de - Search Filter 1.2
 // @namespace    https://example.com
-// @version      1.1
+// @version      1.2
 // @description  Adds a collapsible UI to filter search results by title prefixes and channels.
 // @match        https://www.sendungverpasst.de/search*
 // @grant        none
@@ -63,6 +63,12 @@
             }
         }
         return '';
+    }
+
+    function extractPrefix(title) {
+        const colonIndex = title.indexOf(':');
+        if (colonIndex === -1) return null;
+        return title.substring(0, colonIndex + 1);
     }
 
     function loadSettings() {
@@ -176,6 +182,31 @@
     font-size: 12px;
     z-index: 2147483648;
     min-width: 200px;
+}
+.sv-filter-quick-add {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  padding: 4px 8px;
+  background: rgba(255,255,255,0.95);
+  border: 1px solid rgba(0,0,0,0.2);
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  z-index: 10;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+  transition: all 0.15s;
+  max-width: calc(100% - 16px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sv-filter-quick-add:hover {
+  background: rgba(255,255,255,1);
+  border-color: rgba(0,0,0,0.35);
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(0,0,0,0.2);
 }
 `;
         document.head.appendChild(style);
@@ -298,6 +329,16 @@
             saveSettings(prefixesTextarea.value, channelsTextarea.value, details.open);
             const counts = filterResults(filters);
             updateStatus(counts.filtered, counts.total, counts.hiddenTitles);
+            addQuickAddButtons((prefix) => {
+                const currentList = parseList(prefixesTextarea.value);
+                if (!currentList.includes(prefix)) {
+                    const newText = prefixesTextarea.value.trim() 
+                        ? prefixesTextarea.value.trim() + '\n' + prefix 
+                        : prefix;
+                    prefixesTextarea.value = newText;
+                    applyFilters();
+                }
+            });
         };
 
         const applyFiltersDebounced = debounce(applyFilters, 200);
@@ -381,6 +422,9 @@
                 filtered++;
                 const reason = matchesPrefix ? '(Präfix)' : '(Sender)';
                 hiddenTitles.push({ title: title || '(kein Titel)', reason });
+                // Remove quick-add button if present
+                const existingBtn = card.querySelector('.sv-filter-quick-add');
+                if (existingBtn) existingBtn.remove();
             } else {
                 card.classList.remove(CLASSNAMES.hidden);
             }
@@ -389,30 +433,88 @@
         return { filtered, total: cards.length, hiddenTitles };
     }
 
+    function addQuickAddButtons(onAddPrefix) {
+        // Remove all existing buttons first
+        const existingButtons = document.querySelectorAll('.sv-filter-quick-add');
+        existingButtons.forEach(btn => btn.remove());
+
+        const cards = Array.from(document.querySelectorAll(SELECTORS.resultCard));
+        
+        for (const card of cards) {
+            // Skip if hidden
+            if (card.classList.contains(CLASSNAMES.hidden)) continue;
+
+            const title = getTitleFromCard(card);
+            const prefix = extractPrefix(title);
+            if (!prefix) continue;
+
+            // Make card position relative for absolute button positioning
+            if (!card.style.position) {
+                card.style.position = 'relative';
+            }
+
+            const btn = document.createElement('button');
+            btn.className = 'sv-filter-quick-add';
+            btn.textContent = `+ ${prefix}`;
+            btn.title = `Präfix "${prefix}" zum Filter hinzufügen`;
+            btn.type = 'button';
+            
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onAddPrefix(prefix);
+            });
+
+            card.appendChild(btn);
+        }
+    }
+
     function installAutoReapply(panelApi) {
         let scheduled = false;
+        let isApplying = false;
 
         const reapply = () => {
             scheduled = false;
-            const settings = loadSettings();
-            const filters = {
-                prefixes: parseList(settings.prefixesText),
-                channels: parseList(settings.channelsText)
-            };
-            const counts = filterResults(filters);
-            if (panelApi && panelApi.updateStatus) {
-                panelApi.updateStatus(counts.filtered, counts.total, counts.hiddenTitles);
+            if (isApplying) return;
+            isApplying = true;
+            if (panelApi && panelApi.applyFilters) {
+                panelApi.applyFilters();
             }
+            setTimeout(() => { isApplying = false; }, 300);
         };
 
         const schedule = () => {
-            if (scheduled) return;
+            if (scheduled || isApplying) return;
             scheduled = true;
             setTimeout(reapply, 150);
         };
 
-        // React SPA / pagination / lazy-load changes
-        const observer = new MutationObserver(() => schedule());
+        // React SPA / pagination / lazy-load changes - only watch for new cards
+        const observer = new MutationObserver((mutations) => {
+            // Only trigger if search result cards are added/removed
+            for (const mutation of mutations) {
+                for (const node of mutation.addedNodes) {
+                    if (node.nodeType === 1) {
+                        if (node.matches && node.matches(SELECTORS.resultCard)) {
+                            schedule();
+                            return;
+                        }
+                        if (node.querySelector && node.querySelector(SELECTORS.resultCard)) {
+                            schedule();
+                            return;
+                        }
+                    }
+                }
+                for (const node of mutation.removedNodes) {
+                    if (node.nodeType === 1) {
+                        if (node.matches && node.matches(SELECTORS.resultCard)) {
+                            schedule();
+                            return;
+                        }
+                    }
+                }
+            }
+        });
         observer.observe(document.body, { childList: true, subtree: true });
 
         // Back/forward navigation
