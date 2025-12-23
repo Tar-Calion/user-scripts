@@ -71,6 +71,12 @@
         return title.substring(0, colonIndex + 1);
     }
 
+    // Prefixes to ignore when showing quick-add buttons.
+    // Add more entries here as needed (must include the trailing colon if present).
+    const IGNORED_PREFIXES = [
+        'Spielfilm:'
+    ];
+
     function loadSettings() {
         return {
             prefixesText: localStorage.getItem(STORAGE_KEYS.prefixes) ?? '',
@@ -447,6 +453,14 @@
             const title = getTitleFromCard(card);
             const prefix = extractPrefix(title);
             if (!prefix) continue;
+
+            // Skip prefixes that are explicitly ignored
+            const normPrefix = normalize(prefix);
+            let skip = false;
+            for (const ip of IGNORED_PREFIXES) {
+                if (normalize(ip) === normPrefix) { skip = true; break; }
+            }
+            if (skip) continue;
 
             // Make card position relative for absolute button positioning
             if (!card.style.position) {
