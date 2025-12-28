@@ -1,9 +1,9 @@
 // ==UserScript==
-// @name         Sendungverpasst.de - Search Links
+// @name         Sendungverpasst.de - Search Links 1.1
 // @namespace    https://example.com
-// @version      1.0
+// @version      1.1
 // @description  Adds search engine links (Google, IMDB, Wikipedia) next to content titles
-// @match        https://www.sendungverpasst.de/content/*
+// @match        https://www.sendungverpasst.de/*
 // @grant        none
 // ==/UserScript==
 

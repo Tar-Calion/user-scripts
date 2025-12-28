@@ -1,9 +1,9 @@
 // ==UserScript==
-// @name         Sendungverpasst.de - Search Filter 1.2
+// @name         Sendungverpasst.de - Search Filter 1.3
 // @namespace    https://example.com
-// @version      1.2
+// @version      1.3
 // @description  Adds a collapsible UI to filter search results by title prefixes and channels.
-// @match        https://www.sendungverpasst.de/search*
+// @match        https://www.sendungverpasst.de/*
 // @grant        none
 // ==/UserScript==
 
@@ -487,13 +487,37 @@
         let scheduled = false;
         let isApplying = false;
 
+        const isSearchPage = () => {
+            return window.location.pathname.startsWith('/search');
+        };
+
         const reapply = () => {
             scheduled = false;
             if (isApplying) return;
             isApplying = true;
-            if (panelApi && panelApi.applyFilters) {
-                panelApi.applyFilters();
+
+            // Create panel if on search page and doesn't exist yet
+            let panel = document.getElementById('sv-filter-panel');
+            if (isSearchPage() && !panel) {
+                const newPanelApi = buildPanel();
+                if (newPanelApi) {
+                    panelApi = newPanelApi;
+                }
+                panel = document.getElementById('sv-filter-panel');
             }
+
+            // Show/hide panel based on page type
+            if (panel) {
+                if (isSearchPage()) {
+                    panel.style.display = '';
+                    if (panelApi && panelApi.applyFilters) {
+                        panelApi.applyFilters();
+                    }
+                } else {
+                    panel.style.display = 'none';
+                }
+            }
+
             setTimeout(() => { isApplying = false; }, 300);
         };
 
