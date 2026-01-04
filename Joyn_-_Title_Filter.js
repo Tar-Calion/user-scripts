@@ -34,7 +34,6 @@
         const raw = (multilineText ?? '').toString();
         const lines = raw
             .split(/\r?\n/g)
-            .flatMap(line => line.split(','))
             .map(item => item.trim())
             .filter(Boolean);
 
@@ -281,7 +280,7 @@
         body.className = 'joyn-filter-body';
 
         const titlesLabel = document.createElement('label');
-        titlesLabel.textContent = 'Titel ausblenden (eine pro Zeile, optional Komma)';
+        titlesLabel.textContent = 'Titel ausblenden (ein Titel pro Zeile)';
 
         const titlesTextarea = document.createElement('textarea');
         titlesTextarea.placeholder = 'Beispiel:\nBaywatch - Die Rettungsschwimmer von Malibu';
