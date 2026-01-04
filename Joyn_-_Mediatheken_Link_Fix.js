@@ -21,14 +21,24 @@
         '/mediatheken/kabel-eins-doku': 'https://www.joyn.de/collection/alles-von-kabel-eins-doku?id=944507%3Af134730948761944680d33cf85afd0f7'
     };
 
+    function normalizePath(pathname) {
+        if (!pathname) return '';
+        return pathname.endsWith('/') && pathname !== '/' ? pathname.slice(0, -1) : pathname;
+    }
+
     function extractPathFromHref(href) {
         if (!href) return '';
         try {
             const url = new URL(href, window.location.origin);
-            return url.pathname;
+            return normalizePath(url.pathname);
         } catch {
             return '';
         }
+    }
+
+    function mapPath(pathname) {
+        const normalized = normalizePath(pathname);
+        return LINK_MAPPINGS[normalized] || null;
     }
 
     function rewriteAnchors(root) {
@@ -42,7 +52,7 @@
             if (!pathname) continue;
 
             // Check if there's a specific mapping for this path
-            const mappedUrl = LINK_MAPPINGS[pathname];
+            const mappedUrl = mapPath(pathname);
             if (mappedUrl) {
                 if (anchor.href !== mappedUrl) {
                     anchor.href = mappedUrl;
@@ -53,6 +63,33 @@
                     anchor.href = href + '#alles';
                 }
             }
+        }
+    }
+
+    function handleClickNavigation(event) {
+        const target = event.target;
+        if (!target || !target.closest) return;
+
+        const anchor = target.closest('a[href]');
+        if (!anchor) return;
+
+        const href = anchor.getAttribute('href') || '';
+        if (!href.includes('/mediatheken/') && !href.includes('/channels/')) return;
+
+        const pathname = extractPathFromHref(href);
+        const mappedUrl = mapPath(pathname);
+        if (!mappedUrl) return;
+
+        // Override Joyn's client-side routing that still uses the original path
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        window.location.href = mappedUrl;
+    }
+
+    function enforceMapping() {
+        const mapped = mapPath(window.location.pathname);
+        if (mapped && window.location.href !== mapped) {
+            window.location.replace(mapped);
         }
     }
 
@@ -76,6 +113,22 @@
         observer.observe(document.body, { childList: true, subtree: true });
 
         window.addEventListener('pageshow', () => rewriteAnchors(document));
+        document.addEventListener('click', handleClickNavigation, true);
+        window.addEventListener('popstate', enforceMapping);
+
+        const { pushState, replaceState } = window.history;
+        window.history.pushState = function (...args) {
+            const ret = pushState.apply(this, args);
+            enforceMapping();
+            return ret;
+        };
+        window.history.replaceState = function (...args) {
+            const ret = replaceState.apply(this, args);
+            enforceMapping();
+            return ret;
+        };
+
+        enforceMapping();
     }
 
     if (document.readyState === 'loading') {
