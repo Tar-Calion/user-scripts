@@ -100,4 +100,4 @@ document.head.appendChild(style);
 3. Wrap code in IIFE with `'use strict'`
 4. Wait for DOM ready before manipulating elements
 5. Add debug logging with script-specific prefix
-6. Update [README.md](../README.md) with description and screenshots
+6. Update [README.md](../README.md) and if needed [.github/copilot-instructions.md](../.github/copilot-instructions.md) with new script details.

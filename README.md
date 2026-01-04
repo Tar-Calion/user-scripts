@@ -28,3 +28,7 @@ Adds search engine links on https://www.sendungverpasst.de/content/* pages, plac
 
 Year extraction: If the page contains a meta description with the year in the first line, followed by a double line break, the script extracts that 4-digit year (e.g. 1980) and adds it to the search queries. When no year is present, the search falls back to the title-only variant (with "film" for Google/Wikipedia).
 
+## Joyn_-_Title_Filter.js
+
+Hides selected titles on https://www.joyn.de/ pages. Adds quick "Ausblenden" buttons on cards and stores the hidden-title list in localStorage.
+
