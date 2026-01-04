@@ -254,8 +254,32 @@
         }
     }
 
+    function syncTextareaWithStorage() {
+        const panel = document.getElementById('joyn-filter-panel');
+        if (!panel) return false;
+        
+        const textarea = panel.querySelector('textarea');
+        if (!textarea) return false;
+        
+        const settings = loadSettings();
+        console.log('[Joyn Filter] syncTextareaWithStorage:', {
+            currentValue: textarea.value.split('\n').filter(Boolean).length + ' titles',
+            storageValue: settings.titlesText.split('\n').filter(Boolean).length + ' titles',
+            needsUpdate: textarea.value !== settings.titlesText
+        });
+        if (textarea.value !== settings.titlesText) {
+            textarea.value = settings.titlesText;
+            return true;
+        }
+        return false;
+    }
+
     function buildPanel() {
-        if (document.getElementById('joyn-filter-panel')) return null;
+        const existingPanel = document.getElementById('joyn-filter-panel');
+        if (existingPanel) {
+            syncTextareaWithStorage();
+            return null;
+        }
 
         ensureStyles();
 
@@ -317,28 +341,46 @@
         let recheckTimer;
         let lastFilteredCount = 0;
 
-        const getCurrentFilters = () => ({
-            titles: parseList(titlesTextarea.value)
-        });
+        const getCurrentFilters = () => {
+            const panel = document.getElementById('joyn-filter-panel');
+            const textarea = panel?.querySelector('textarea');
+            return {
+                titles: parseList(textarea?.value ?? '')
+            };
+        };
 
         const updateStatus = (filteredCount, totalCount) => {
+            const panel = document.getElementById('joyn-filter-panel');
+            const textarea = panel?.querySelector('textarea');
+            const tCount = parseList(textarea?.value ?? '').length;
             pill.textContent = `${filteredCount}/${totalCount}`;
-            const tCount = parseList(titlesTextarea.value).length;
             status.textContent = `Ausgeblendet: ${filteredCount} von ${totalCount} (Titel: ${tCount})`;
         };
 
         const applyFilters = () => {
+            const panel = document.getElementById('joyn-filter-panel');
+            const textarea = panel?.querySelector('textarea');
+            const detailsEl = panel?.querySelector('details');
+            if (!panel || !textarea || !detailsEl) return;
+            
             const filters = getCurrentFilters();
-            saveSettings(titlesTextarea.value, details.open);
+            saveSettings(textarea.value, detailsEl.open);
             const counts = filterResults(filters);
             updateStatus(counts.filtered, counts.total);
             addQuickAddButtons((title) => {
-                const currentList = parseList(titlesTextarea.value);
+                const panel = document.getElementById('joyn-filter-panel');
+                const textarea = panel?.querySelector('textarea');
+                const detailsEl = panel?.querySelector('details');
+                if (!textarea || !detailsEl) return;
+                
+                const currentList = parseList(textarea.value);
                 if (!currentList.some(t => normalize(t) === normalize(title))) {
-                    const newText = titlesTextarea.value.trim()
-                        ? `${titlesTextarea.value.trim()}\n${title}`
+                    const newText = textarea.value.trim()
+                        ? `${textarea.value.trim()}\n${title}`
                         : title;
-                    titlesTextarea.value = newText;
+                    textarea.value = newText;
+                    // Speichern Sie sofort, bevor applyFilters aufgerufen wird
+                    saveSettings(textarea.value, detailsEl.open);
                     applyFilters();
                 }
             }, filters.titles);
@@ -357,19 +399,38 @@
 
         applyButton.addEventListener('click', applyFilters);
         resetButton.addEventListener('click', () => {
-            titlesTextarea.value = '';
-            applyFilters();
+            const panel = document.getElementById('joyn-filter-panel');
+            const textarea = panel?.querySelector('textarea');
+            if (textarea) {
+                textarea.value = '';
+                applyFilters();
+            }
         });
 
         titlesTextarea.addEventListener('input', applyFiltersDebounced);
 
         details.addEventListener('toggle', () => {
-            saveSettings(titlesTextarea.value, details.open);
+            const panel = document.getElementById('joyn-filter-panel');
+            const textarea = panel?.querySelector('textarea');
+            const detailsEl = panel?.querySelector('details');
+            if (textarea && detailsEl) {
+                saveSettings(textarea.value, detailsEl.open);
+            }
         });
 
         setTimeout(applyFilters, 0);
 
-        return { applyFilters };
+        return { applyFilters, reloadSettings: () => {
+            const panel = document.getElementById('joyn-filter-panel');
+            const textarea = panel?.querySelector('textarea');
+            const detailsEl = panel?.querySelector('details');
+            if (textarea && detailsEl) {
+                const freshSettings = loadSettings();
+                textarea.value = freshSettings.titlesText;
+                detailsEl.open = freshSettings.panelOpen;
+                applyFilters();
+            }
+        }};
     }
 
     function installAutoReapply(panelApi) {
@@ -397,12 +458,25 @@
                 panel = document.getElementById('joyn-filter-panel');
             }
 
-            if (panel && panelApi && panelApi.applyFilters) {
-                panel.style.display = '';
-                panelApi.applyFilters();
+            if (panel) {
+                // Synchronisiere Textarea mit localStorage VOR dem Anwenden der Filter
+                syncTextareaWithStorage();
+                
+                if (panelApi && panelApi.applyFilters) {
+                    panel.style.display = '';
+                    panelApi.applyFilters();
+                }
             }
 
             setTimeout(() => { isApplying = false; }, 300);
+        };
+
+        const reloadAndReapply = () => {
+            if (syncTextareaWithStorage()) {
+                schedule();
+            } else {
+                schedule();
+            }
         };
 
         const observer = new MutationObserver((mutations) => {
@@ -423,7 +497,15 @@
         });
         observer.observe(document.body, { childList: true, subtree: true });
 
-        window.addEventListener('popstate', schedule);
+        window.addEventListener('popstate', reloadAndReapply);
+        
+        // Handle BFCache (Back-Forward Cache) restoration
+        window.addEventListener('pageshow', (event) => {
+            if (event.persisted) {
+                // Page was loaded from BFCache
+                reloadAndReapply();
+            }
+        });
 
         // Re-apply 0.5s after any scroll (covers incremental row loads)
         window.addEventListener('scroll', () => {
