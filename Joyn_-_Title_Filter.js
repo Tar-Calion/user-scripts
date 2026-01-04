@@ -315,6 +315,9 @@
         root.appendChild(details);
         document.body.appendChild(root);
 
+        let recheckTimer;
+        let lastFilteredCount = 0;
+
         const getCurrentFilters = () => ({
             titles: parseList(titlesTextarea.value)
         });
@@ -340,6 +343,15 @@
                     applyFilters();
                 }
             }, filters.titles);
+
+            // Wenn neue Elemente gefiltert wurden, nach 0,5s erneut prüfen
+            clearTimeout(recheckTimer);
+            if (counts.filtered > 0 && counts.filtered > lastFilteredCount) {
+                lastFilteredCount = counts.filtered;
+                recheckTimer = setTimeout(applyFilters, 500);
+            } else {
+                lastFilteredCount = counts.filtered;
+            }
         };
 
         const applyFiltersDebounced = debounce(applyFilters, 200);
@@ -364,6 +376,7 @@
     function installAutoReapply(panelApi) {
         let scheduled = false;
         let isApplying = false;
+        let scrollTimer;
 
         const schedule = () => {
             if (scheduled || isApplying) return;
@@ -412,6 +425,12 @@
         observer.observe(document.body, { childList: true, subtree: true });
 
         window.addEventListener('popstate', schedule);
+
+        // Re-apply 0.5s after any scroll (covers incremental row loads)
+        window.addEventListener('scroll', () => {
+            clearTimeout(scrollTimer);
+            scrollTimer = setTimeout(schedule, 500);
+        }, { passive: true });
 
         const patchHistory = (method) => {
             const original = history[method];
