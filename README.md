@@ -32,3 +32,10 @@ Year extraction: If the page contains a meta description with the year in the fi
 
 Hides selected titles on https://www.joyn.de/ pages. Adds quick "Ausblenden" buttons on cards and stores the hidden-title list in localStorage.
 
+## Joyn_-_Mediatheken_Link_Fix.js
+
+Rewrites Mediatheken links on https://www.joyn.de/mediatheken:
+
+- Maps specific channels (SAT.1, ProSieben, Kabel Eins, sixx, SAT.1 Gold, ProSieben MAXX, Kabel Eins Doku) to their collection URLs
+- Appends `#alles` to all other `/mediatheken/*` and `/channels/*` links
+
