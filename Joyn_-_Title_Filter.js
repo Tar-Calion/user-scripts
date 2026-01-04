@@ -418,7 +418,7 @@
             }
         });
 
-        setTimeout(applyFilters, 0);
+        setTimeout(applyFilters, 2000);
 
         return { applyFilters, reloadSettings: () => {
             const panel = document.getElementById('joyn-filter-panel');
