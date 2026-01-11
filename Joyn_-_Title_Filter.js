@@ -1,12 +1,12 @@
 // ==UserScript==
-// @name         Joyn.de - Title Filter 1.1
+// @name         Joyn.de - Title Filter 1.2
 // @namespace    https://example.com
-// @version      1.1
+// @version      1.2
 // @description  Hide selected titles on Joyn mediathek lists with quick add buttons.
 // @match        https://www.joyn.de/*
 // @exclude      https://www.joyn.de/mediatheken
 // @match        https://joyn.de/*
-// @grant        none
+// @grant        GM_download
 // ==/UserScript==
 
 (function () {
@@ -15,7 +15,8 @@
     const STORAGE_KEYS = {
         titles: 'joyn_filter_titles',
         panelOpen: 'joyn_filter_panel_open',
-        hideJoynPlus: 'joyn_filter_hide_joyn_plus'
+        hideJoynPlus: 'joyn_filter_hide_joyn_plus',
+        lastFilePath: 'joyn_filter_last_file_path'
     };
 
     const SELECTORS = {
@@ -351,12 +352,17 @@
         applyButton.type = 'button';
         applyButton.textContent = 'Anwenden';
 
-        const resetButton = document.createElement('button');
-        resetButton.type = 'button';
-        resetButton.textContent = 'Zurücksetzen';
+        const saveButton = document.createElement('button');
+        saveButton.type = 'button';
+        saveButton.textContent = 'Speichern unter';
+
+        const loadButton = document.createElement('button');
+        loadButton.type = 'button';
+        loadButton.textContent = 'Aus Datei laden';
 
         buttonRow.appendChild(applyButton);
-        buttonRow.appendChild(resetButton);
+        buttonRow.appendChild(saveButton);
+        buttonRow.appendChild(loadButton);
 
         const status = document.createElement('div');
         status.className = 'joyn-filter-status';
@@ -457,13 +463,97 @@
         const applyFiltersDebounced = debounce(applyFilters, 200);
 
         applyButton.addEventListener('click', applyFilters);
-        resetButton.addEventListener('click', () => {
+        
+        saveButton.addEventListener('click', async () => {
             const panel = document.getElementById('joyn-filter-panel');
             const textarea = panel?.querySelector('textarea');
-            if (textarea) {
-                textarea.value = '';
-                applyFilters();
+            if (!textarea) return;
+
+            const data = {
+                titles: parseList(textarea.value),
+                hideJoynPlus: (localStorage.getItem(STORAGE_KEYS.hideJoynPlus) ?? 'true') === 'true',
+                exportedAt: new Date().toISOString()
+            };
+
+            const fileName = `joyn-filter-${new Date().toISOString().split('T')[0]}.json`;
+            const jsonString = JSON.stringify(data, null, 2);
+
+            try {
+                // Versuche File System Access API zu nutzen
+                const handle = await window.showSaveFilePicker({
+                    suggestedName: fileName,
+                    types: [{ description: 'JSON Datei', accept: { 'application/json': ['.json'] } }]
+                });
+                const writable = await handle.createWritable();
+                await writable.write(jsonString);
+                await writable.close();
+                status.textContent = 'Filter gespeichert.';
+            } catch (err) {
+                if (err.name === 'AbortError') {
+                    return; // Benutzer hat abgebrochen
+                }
+                // Fallback: nutze GM_download wenn File System Access API nicht verfügbar
+                const blob = new Blob([jsonString], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                try {
+                    GM_download({
+                        url: url,
+                        name: fileName,
+                        onload: () => {
+                            status.textContent = 'Filter gespeichert.';
+                        },
+                        onerror: () => {
+                            status.textContent = 'Fehler beim Speichern.';
+                        }
+                    });
+                } catch (downloadErr) {
+                    // Letztes Fallback: Standard Download
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = fileName;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    status.textContent = 'Filter gespeichert (Downloads Ordner).';
+                } finally {
+                    setTimeout(() => URL.revokeObjectURL(url), 100);
+                }
             }
+        });
+
+        loadButton.addEventListener('click', () => {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.json';
+            input.addEventListener('change', (e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    try {
+                        const data = JSON.parse(event.target?.result ?? '{}');
+                        const panel = document.getElementById('joyn-filter-panel');
+                        const textarea = panel?.querySelector('textarea');
+                        const checkbox = panel?.querySelector('#joyn-filter-hide-joyn-plus');
+                        const detailsEl = panel?.querySelector('details');
+                        
+                        if (textarea && checkbox && detailsEl) {
+                            const titlesText = (data.titles ?? []).join('\n');
+                            textarea.value = titlesText;
+                            checkbox.checked = data.hideJoynPlus ?? true;
+                            saveSettings(titlesText, detailsEl.open, checkbox.checked);
+                            applyFilters();
+                            status.textContent = `${data.titles?.length ?? 0} Filter geladen.`;
+                        }
+                    } catch (err) {
+                        console.error('[Joyn Filter] Fehler beim Laden der Datei:', err);
+                        status.textContent = 'Fehler beim Laden der Datei.';
+                    }
+                };
+                reader.readAsText(file);
+            });
+            input.click();
         });
 
         titlesTextarea.addEventListener('input', applyFiltersDebounced);
