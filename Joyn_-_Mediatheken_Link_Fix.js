@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         Joyn.de - Mediatheken Link Fix 1.2
+// @name         Joyn.de - Mediatheken Link Fix 1.3
 // @namespace    https://example.com
-// @version      1.2
+// @version      1.3
 // @description  Replace Joyn Mediatheken links with collection URLs or add #alles anchor.
 // @match        https://www.joyn.de/mediatheken
 // @match        https://joyn.de/mediatheken
@@ -132,17 +132,14 @@
             // Check if there's a specific mapping for this path
             const mappedUrl = mapPath(pathname);
             if (mappedUrl) {
-                if (anchor.href !== mappedUrl) {
-                    const oldHref = anchor.href;
-                    anchor.href = mappedUrl;
-                    addToList(oldHref, mappedUrl, imgSrc);
-                }
+                const oldHref = anchor.href;
+                addToList(oldHref, mappedUrl, imgSrc);
             } else if (pathname.startsWith('/mediatheken/') || pathname.startsWith('/channels/')) {
                 // For all other /mediatheken/* and /channels/* links, add #alles if not already present
                 if (!href.includes('#alles') && !anchor.hash) {
                     const oldHref = anchor.href;
-                    anchor.href = href + '#alles';
-                    addToList(oldHref, anchor.href, imgSrc);
+                    const newHref = oldHref + (oldHref.includes('?') ? '' : '') + '#alles';
+                    addToList(oldHref, newHref, imgSrc);
                 }
             }
         }
@@ -195,22 +192,6 @@
         observer.observe(document.body, { childList: true, subtree: true });
 
         window.addEventListener('pageshow', () => rewriteAnchors(document));
-        document.addEventListener('click', handleClickNavigation, true);
-        window.addEventListener('popstate', enforceMapping);
-
-        const { pushState, replaceState } = window.history;
-        window.history.pushState = function (...args) {
-            const ret = pushState.apply(this, args);
-            enforceMapping();
-            return ret;
-        };
-        window.history.replaceState = function (...args) {
-            const ret = replaceState.apply(this, args);
-            enforceMapping();
-            return ret;
-        };
-
-        enforceMapping();
     }
 
     if (document.readyState === 'loading') {
