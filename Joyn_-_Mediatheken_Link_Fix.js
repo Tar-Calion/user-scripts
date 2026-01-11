@@ -1,15 +1,18 @@
 // ==UserScript==
-// @name         Joyn.de - Mediatheken Link Fix 1.1
+// @name         Joyn.de - Mediatheken Link Fix 1.2
 // @namespace    https://example.com
-// @version      1.1
+// @version      1.2
 // @description  Replace Joyn Mediatheken links with collection URLs or add #alles anchor.
-// @match        https://www.joyn.de/mediatheken*
-// @match        https://joyn.de/mediatheken*
+// @match        https://www.joyn.de/mediatheken
+// @match        https://joyn.de/mediatheken
 // @grant        none
 // ==/UserScript==
 
 (function () {
     'use strict';
+
+    const adjustedLinks = [];
+    let listContainer = null;
 
     const LINK_MAPPINGS = {
         '/mediatheken/sat1': 'https://www.joyn.de/collection/alles-von-sat.1?id=976975%3A3790ddef147824b00c4d162b1921d175',
@@ -41,6 +44,63 @@
         return LINK_MAPPINGS[normalized] || null;
     }
 
+    function addToList(originalHref, newHref) {
+        const entry = { original: originalHref, new: newHref };
+        if (!adjustedLinks.some(item => item.original === originalHref && item.new === newHref)) {
+            adjustedLinks.push(entry);
+            updateList();
+        }
+    }
+
+    function createList() {
+        // Prüfe ob Liste bereits existiert
+        let existing = document.getElementById('adjusted-links-container');
+        if (existing) {
+            listContainer = existing;
+            return;
+        }
+
+        listContainer = document.createElement('div');
+        listContainer.id = 'adjusted-links-container';
+        listContainer.style.cssText = 'position: fixed; top: 10px; left: 10px; width: 1600px; max-height: 100vh; overflow-y: auto; background: rgba(30, 30, 30, 0.95); border: 1px solid #555; padding: 15px; border-radius: 5px; font-size: 12px; z-index: 99999; box-shadow: 0 2px 10px rgba(0,0,0,0.5); color: #fff;';
+        listContainer.innerHTML = '<strong style="display: block; margin-bottom: 10px; color: #fff;">Angepasste Links:</strong><ul id="adjusted-links-list" style="margin: 0; padding-left: 20px; list-style-type: disc;"></ul>';
+        
+        document.body.appendChild(listContainer);
+    }
+
+    function updateList() {
+        createList();
+        if (!listContainer) return;
+
+        const list = listContainer.querySelector('#adjusted-links-list');
+        if (!list) return;
+
+        list.innerHTML = '';
+        for (const entry of adjustedLinks) {
+            const li = document.createElement('li');
+            li.style.marginBottom = '10px';
+            li.style.wordBreak = 'break-all';
+            li.style.color = '#fff';
+            
+            const link = document.createElement('a');
+            link.href = entry.new;
+            link.target = '_blank';
+            link.style.cssText = 'color: #4da6ff; text-decoration: none; word-break: break-all;';
+            link.textContent = entry.new;
+            link.onmouseover = function() { this.style.textDecoration = 'underline'; };
+            link.onmouseout = function() { this.style.textDecoration = 'none'; };
+            
+            li.appendChild(link);
+            list.appendChild(li);
+        }
+    }
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
     function rewriteAnchors(root) {
         if (!root || !root.querySelectorAll) return;
         const anchors = root.querySelectorAll('a[href*="/mediatheken/"], a[href*="/channels/"]');
@@ -55,12 +115,16 @@
             const mappedUrl = mapPath(pathname);
             if (mappedUrl) {
                 if (anchor.href !== mappedUrl) {
+                    const oldHref = anchor.href;
                     anchor.href = mappedUrl;
+                    addToList(oldHref, mappedUrl);
                 }
             } else if (pathname.startsWith('/mediatheken/') || pathname.startsWith('/channels/')) {
                 // For all other /mediatheken/* and /channels/* links, add #alles if not already present
                 if (!href.includes('#alles') && !anchor.hash) {
+                    const oldHref = anchor.href;
                     anchor.href = href + '#alles';
+                    addToList(oldHref, anchor.href);
                 }
             }
         }
