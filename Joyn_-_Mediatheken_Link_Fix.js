@@ -12,7 +12,51 @@
     'use strict';
 
     const adjustedLinks = [];
+    let ignoredSenders = [];
     let listContainer = null;
+
+    // localStorage key for ignored senders
+    const IGNORED_SENDERS_KEY = 'joyn-ignored-senders';
+
+    function loadIgnoredSenders() {
+        try {
+            const stored = localStorage.getItem(IGNORED_SENDERS_KEY);
+            if (stored) {
+                ignoredSenders = JSON.parse(stored);
+            }
+        } catch (e) {
+            console.log('[Joyn Link Fix] Error loading ignored senders:', e);
+        }
+    }
+
+    function saveIgnoredSenders() {
+        try {
+            localStorage.setItem(IGNORED_SENDERS_KEY, JSON.stringify(ignoredSenders));
+        } catch (e) {
+            console.log('[Joyn Link Fix] Error saving ignored senders:', e);
+        }
+    }
+
+    function isIgnored(path) {
+        return ignoredSenders.includes(path);
+    }
+
+    function ignoreSender(path) {
+        if (!isIgnored(path)) {
+            ignoredSenders.push(path);
+            saveIgnoredSenders();
+            updateList();
+        }
+    }
+
+    function unignoreSender(path) {
+        const index = ignoredSenders.indexOf(path);
+        if (index > -1) {
+            ignoredSenders.splice(index, 1);
+            saveIgnoredSenders();
+            updateList();
+        }
+    }
 
     const LINK_MAPPINGS = {
         '/mediatheken/sat1': 'https://www.joyn.de/collection/alles-von-sat.1?id=976975%3A3790ddef147824b00c4d162b1921d175',
@@ -130,9 +174,94 @@
         listContainer = document.createElement('div');
         listContainer.id = 'adjusted-links-container';
         listContainer.style.cssText = 'position: fixed; top: 10px; left: 10px; right: 10px; max-height: 90vh; overflow-y: auto; background: rgba(30, 30, 30, 0.95); border: 1px solid #555; padding: 15px; border-radius: 5px; font-size: 12px; z-index: 99999; box-shadow: 0 2px 10px rgba(0,0,0,0.5); color: #fff;';
-        listContainer.innerHTML = '<strong style="display: block; margin-bottom: 10px; color: #fff; font-size: 16px;">Angepasste Sender-Links:</strong><div id="adjusted-links-list" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 12px; margin: 0; padding: 0;"></div>';
+        listContainer.innerHTML = '<strong style="display: block; margin-bottom: 10px; color: #fff; font-size: 16px;">Angepasste Sender-Links:</strong><div id="adjusted-links-list" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 12px; margin: 0 0 20px 0; padding: 0;"></div><strong style="display: block; margin-bottom: 10px; color: #999; font-size: 14px;">Ignorierte Sender:</strong><div id="ignored-links-list" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 12px; margin: 0; padding: 0;"></div>';
         
         document.body.appendChild(listContainer);
+    }
+
+    function createCard(entry, isIgnoredSection) {
+        // outer container for anchor + button
+        const container = document.createElement('div');
+        container.style.cssText = 'position: relative; display: block;';
+
+        // outer anchor makes the card clickable
+        const outerAnchor = document.createElement('a');
+        outerAnchor.href = entry.new;
+        outerAnchor.target = '_blank';
+        outerAnchor.style.cssText = 'text-decoration: none; color: inherit; display: block;';
+
+        const card = document.createElement('div');
+        card.style.cssText = 'display: flex; align-items: flex-start; gap: 12px; background: rgba(50, 50, 50, 0.8); padding: 10px; border-radius: 8px; border: 1px solid #444; transition: all 0.2s;';
+        card.setAttribute('role', 'link');
+        card.tabIndex = 0;
+        card.onmouseover = function() {
+            this.style.background = 'rgba(70, 70, 70, 0.9)';
+            this.style.borderColor = '#666';
+        };
+        card.onmouseout = function() {
+            this.style.background = 'rgba(50, 50, 50, 0.8)';
+            this.style.borderColor = '#444';
+        };
+        card.onkeydown = function(e) {
+            if (e.key === 'Enter' || e.key === ' ') {
+                window.open(entry.new, '_blank');
+                e.preventDefault();
+            }
+        };
+
+        // image
+        if (entry.imgSrc) {
+            const img = document.createElement('img');
+            img.src = entry.imgSrc;
+            img.alt = '';
+            img.style.cssText = 'width: 80px; height: auto; display: block; border-radius: 4px; transition: transform 0.2s; flex-shrink: 0;';
+            card.appendChild(img);
+        }
+
+        const textContainer = document.createElement('div');
+        textContainer.style.cssText = 'flex: 1; min-width: 0;';
+
+        if (entry.description) {
+            const descText = document.createElement('p');
+            descText.textContent = entry.description;
+            descText.style.cssText = 'margin: 0; color: #ddd; font-size: 11px; line-height: 1.4; overflow-wrap: break-word;';
+            textContainer.appendChild(descText);
+        } else {
+            const urlText = document.createElement('span');
+            urlText.textContent = entry.new;
+            urlText.style.cssText = 'color: #4da6ff; font-size: 11px; word-break: break-all;';
+            textContainer.appendChild(urlText);
+        }
+
+        card.appendChild(textContainer);
+        outerAnchor.appendChild(card);
+        container.appendChild(outerAnchor);
+
+        // Add ignore/unignore button
+        const button = document.createElement('button');
+        button.style.cssText = 'position: absolute; top: 8px; right: 8px; background: rgba(0, 0, 0, 0.7); border: 1px solid #666; border-radius: 4px; padding: 6px 10px; cursor: pointer; color: #fff; font-size: 16px; z-index: 10; transition: all 0.2s;';
+        button.innerHTML = isIgnoredSection ? '↑' : '↓';
+        button.title = isIgnoredSection ? 'Sender wieder anzeigen' : 'Sender ignorieren';
+        button.onmouseover = function() {
+            this.style.background = 'rgba(0, 0, 0, 0.9)';
+            this.style.borderColor = '#888';
+        };
+        button.onmouseout = function() {
+            this.style.background = 'rgba(0, 0, 0, 0.7)';
+            this.style.borderColor = '#666';
+        };
+        button.onclick = function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (isIgnoredSection) {
+                unignoreSender(entry.path);
+            } else {
+                ignoreSender(entry.path);
+            }
+        };
+        container.appendChild(button);
+
+        return container;
     }
 
     function updateList() {
@@ -140,62 +269,24 @@
         if (!listContainer) return;
 
         const list = listContainer.querySelector('#adjusted-links-list');
-        if (!list) return;
+        const ignoredList = listContainer.querySelector('#ignored-links-list');
+        if (!list || !ignoredList) return;
 
         list.innerHTML = '';
-        for (const entry of adjustedLinks) {
-            // outer anchor makes the whole card clickable
-            const outerAnchor = document.createElement('a');
-            outerAnchor.href = entry.new;
-            outerAnchor.target = '_blank';
-            outerAnchor.style.cssText = 'text-decoration: none; color: inherit; display: block;';
+        ignoredList.innerHTML = '';
 
-            const card = document.createElement('div');
-            card.style.cssText = 'display: flex; align-items: flex-start; gap: 12px; background: rgba(50, 50, 50, 0.8); padding: 10px; border-radius: 8px; border: 1px solid #444; transition: all 0.2s;';
-            card.setAttribute('role', 'link');
-            card.tabIndex = 0;
-            card.onmouseover = function() {
-                this.style.background = 'rgba(70, 70, 70, 0.9)';
-                this.style.borderColor = '#666';
-            };
-            card.onmouseout = function() {
-                this.style.background = 'rgba(50, 50, 50, 0.8)';
-                this.style.borderColor = '#444';
-            };
-            card.onkeydown = function(e) {
-                if (e.key === 'Enter' || e.key === ' ') {
-                    window.open(entry.new, '_blank');
-                    e.preventDefault();
-                }
-            };
+        // Separate entries into regular and ignored
+        const regularEntries = adjustedLinks.filter(entry => !isIgnored(entry.path));
+        const ignoredEntries = adjustedLinks.filter(entry => isIgnored(entry.path));
 
-            // image (no nested anchor)
-            if (entry.imgSrc) {
-                const img = document.createElement('img');
-                img.src = entry.imgSrc;
-                img.alt = '';
-                img.style.cssText = 'width: 80px; height: auto; display: block; border-radius: 4px; transition: transform 0.2s; flex-shrink: 0;';
-                card.appendChild(img);
-            }
+        // Render regular entries
+        for (const entry of regularEntries) {
+            list.appendChild(createCard(entry, false));
+        }
 
-            const textContainer = document.createElement('div');
-            textContainer.style.cssText = 'flex: 1; min-width: 0;';
-
-            if (entry.description) {
-                const descText = document.createElement('p');
-                descText.textContent = entry.description;
-                descText.style.cssText = 'margin: 0; color: #ddd; font-size: 11px; line-height: 1.4; overflow-wrap: break-word;';
-                textContainer.appendChild(descText);
-            } else {
-                const urlText = document.createElement('span');
-                urlText.textContent = entry.new;
-                urlText.style.cssText = 'color: #4da6ff; font-size: 11px; word-break: break-all;';
-                textContainer.appendChild(urlText);
-            }
-
-            card.appendChild(textContainer);
-            outerAnchor.appendChild(card);
-            list.appendChild(outerAnchor);
+        // Render ignored entries
+        for (const entry of ignoredEntries) {
+            ignoredList.appendChild(createCard(entry, true));
         }
     }
 
@@ -223,6 +314,7 @@
                 if (!href.includes('#alles') && !anchor.hash) {
                     const oldHref = anchor.href;
                     const newHref = oldHref + (oldHref.includes('?') ? '' : '') + '#alles';
+        loadIgnoredSenders();
                     addToList(oldHref, newHref, imgSrc, pathname);
                 }
             }
