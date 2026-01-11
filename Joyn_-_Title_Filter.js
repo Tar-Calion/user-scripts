@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         Joyn.de - Title Filter 1.0
+// @name         Joyn.de - Title Filter 1.1
 // @namespace    https://example.com
-// @version      1.0
+// @version      1.1
 // @description  Hide selected titles on Joyn mediathek lists with quick add buttons.
 // @match        https://www.joyn.de/*
 // @match        https://joyn.de/*
@@ -13,7 +13,8 @@
 
     const STORAGE_KEYS = {
         titles: 'joyn_filter_titles',
-        panelOpen: 'joyn_filter_panel_open'
+        panelOpen: 'joyn_filter_panel_open',
+        hideJoynPlus: 'joyn_filter_hide_joyn_plus'
     };
 
     const SELECTORS = {
@@ -47,13 +48,15 @@
     function loadSettings() {
         return {
             titlesText: localStorage.getItem(STORAGE_KEYS.titles) ?? '',
-            panelOpen: (localStorage.getItem(STORAGE_KEYS.panelOpen) ?? 'true') === 'true'
+            panelOpen: (localStorage.getItem(STORAGE_KEYS.panelOpen) ?? 'true') === 'true',
+            hideJoynPlus: (localStorage.getItem(STORAGE_KEYS.hideJoynPlus) ?? 'true') === 'true'
         };
     }
 
-    function saveSettings(titlesText, panelOpen) {
+    function saveSettings(titlesText, panelOpen, hideJoynPlus) {
         localStorage.setItem(STORAGE_KEYS.titles, titlesText ?? '');
         localStorage.setItem(STORAGE_KEYS.panelOpen, panelOpen ? 'true' : 'false');
+        localStorage.setItem(STORAGE_KEYS.hideJoynPlus, hideJoynPlus ? 'true' : 'false');
     }
 
     function ensureStyles() {
@@ -141,6 +144,27 @@
   margin-left: 8px;
   font-weight: 600;
 }
+.${CLASSNAMES.root} .joyn-filter-checkbox-container {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(0,0,0,0.10);
+}
+.${CLASSNAMES.root} .joyn-filter-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.${CLASSNAMES.root} .joyn-filter-checkbox input[type="checkbox"] {
+  cursor: pointer;
+  width: 16px;
+  height: 16px;
+}
+.${CLASSNAMES.root} .joyn-filter-checkbox label {
+  margin: 0;
+  font-weight: 600;
+  font-size: 12px;
+  cursor: pointer;
+}
 .joyn-filter-quick {
   position: absolute;
   top: 8px;
@@ -185,6 +209,12 @@
         return aria.substring(0, firstDot).trim();
     }
 
+    function hasJoynPlusBadge(item) {
+        const svg = item.querySelector('svg[role="img"] title, svg title');
+        if (!svg) return false;
+        return svg.textContent.trim().toLowerCase() === 'joyn plus';
+    }
+
     function getTitleFromCard(card) {
         const aria = card.getAttribute('aria-label');
         return extractTitleFromAria(aria);
@@ -193,19 +223,22 @@
     function filterResults(filters) {
         const items = Array.from(document.querySelectorAll(SELECTORS.item));
         let filtered = 0;
+        let filteredJoynPlus = 0;
 
         for (const item of items) {
             const card = item.querySelector(SELECTORS.card);
             if (!card) continue;
 
             const title = getTitleFromCard(card);
-            const shouldHide = title && filters.titles.length > 0 && filters.titles.some(t => normalize(t) === normalize(title));
+            const isJoynPlus = filters.hideJoynPlus && hasJoynPlusBadge(item);
+            const shouldHide = isJoynPlus || (title && filters.titles.length > 0 && filters.titles.some(t => normalize(t) === normalize(title)));
 
             if (shouldHide) {
                 if (!item.classList.contains(CLASSNAMES.hidden)) {
                     item.classList.add(CLASSNAMES.hidden);
                 }
                 filtered++;
+                if (isJoynPlus) filteredJoynPlus++;
                 const existingBtn = card.querySelector('.joyn-filter-quick');
                 if (existingBtn) existingBtn.remove();
             } else {
@@ -213,7 +246,7 @@
             }
         }
 
-        return { filtered, total: items.length };
+        return { filtered, total: items.length, filteredJoynPlus };
     }
 
     function addQuickAddButtons(onAddTitle, currentTitles) {
@@ -328,9 +361,29 @@
         status.className = 'joyn-filter-status';
         status.textContent = 'Bereit.';
 
+        const checkboxContainer = document.createElement('div');
+        checkboxContainer.className = 'joyn-filter-checkbox-container';
+
+        const checkboxWrapper = document.createElement('div');
+        checkboxWrapper.className = 'joyn-filter-checkbox';
+
+        const joynPlusCheckbox = document.createElement('input');
+        joynPlusCheckbox.type = 'checkbox';
+        joynPlusCheckbox.id = 'joyn-filter-hide-joyn-plus';
+        joynPlusCheckbox.checked = settings.hideJoynPlus;
+
+        const joynPlusLabel = document.createElement('label');
+        joynPlusLabel.htmlFor = 'joyn-filter-hide-joyn-plus';
+        joynPlusLabel.textContent = 'Joyn Plus ausblenden';
+
+        checkboxWrapper.appendChild(joynPlusCheckbox);
+        checkboxWrapper.appendChild(joynPlusLabel);
+        checkboxContainer.appendChild(checkboxWrapper);
+
         body.appendChild(titlesLabel);
         body.appendChild(titlesTextarea);
         body.appendChild(buttonRow);
+        body.appendChild(checkboxContainer);
         body.appendChild(status);
 
         details.appendChild(summary);
@@ -344,34 +397,39 @@
         const getCurrentFilters = () => {
             const panel = document.getElementById('joyn-filter-panel');
             const textarea = panel?.querySelector('textarea');
+            const checkbox = panel?.querySelector('#joyn-filter-hide-joyn-plus');
             return {
-                titles: parseList(textarea?.value ?? '')
+                titles: parseList(textarea?.value ?? ''),
+                hideJoynPlus: checkbox?.checked ?? false
             };
         };
 
-        const updateStatus = (filteredCount, totalCount) => {
+        const updateStatus = (filteredCount, totalCount, filteredJoynPlus) => {
             const panel = document.getElementById('joyn-filter-panel');
             const textarea = panel?.querySelector('textarea');
             const tCount = parseList(textarea?.value ?? '').length;
             pill.textContent = `${filteredCount}/${totalCount}`;
-            status.textContent = `Ausgeblendet: ${filteredCount} von ${totalCount} (Titel: ${tCount})`;
+            const joynPlusInfo = filteredJoynPlus > 0 ? ` (davon ${filteredJoynPlus} Joyn Plus)` : '';
+            status.textContent = `Ausgeblendet: ${filteredCount} von ${totalCount} (Titel: ${tCount})${joynPlusInfo}`;
         };
 
         const applyFilters = () => {
             const panel = document.getElementById('joyn-filter-panel');
             const textarea = panel?.querySelector('textarea');
             const detailsEl = panel?.querySelector('details');
-            if (!panel || !textarea || !detailsEl) return;
+            const checkbox = panel?.querySelector('#joyn-filter-hide-joyn-plus');
+            if (!panel || !textarea || !detailsEl || !checkbox) return;
             
             const filters = getCurrentFilters();
-            saveSettings(textarea.value, detailsEl.open);
+            saveSettings(textarea.value, detailsEl.open, checkbox.checked);
             const counts = filterResults(filters);
-            updateStatus(counts.filtered, counts.total);
+            updateStatus(counts.filtered, counts.total, counts.filteredJoynPlus);
             addQuickAddButtons((title) => {
                 const panel = document.getElementById('joyn-filter-panel');
                 const textarea = panel?.querySelector('textarea');
                 const detailsEl = panel?.querySelector('details');
-                if (!textarea || !detailsEl) return;
+                const checkbox = panel?.querySelector('#joyn-filter-hide-joyn-plus');
+                if (!textarea || !detailsEl || !checkbox) return;
                 
                 const currentList = parseList(textarea.value);
                 if (!currentList.some(t => normalize(t) === normalize(title))) {
@@ -380,7 +438,7 @@
                         : title;
                     textarea.value = newText;
                     // Speichern Sie sofort, bevor applyFilters aufgerufen wird
-                    saveSettings(textarea.value, detailsEl.open);
+                    saveSettings(textarea.value, detailsEl.open, checkbox.checked);
                     applyFilters();
                 }
             }, filters.titles);
@@ -409,12 +467,15 @@
 
         titlesTextarea.addEventListener('input', applyFiltersDebounced);
 
+        joynPlusCheckbox.addEventListener('change', applyFilters);
+
         details.addEventListener('toggle', () => {
             const panel = document.getElementById('joyn-filter-panel');
             const textarea = panel?.querySelector('textarea');
             const detailsEl = panel?.querySelector('details');
-            if (textarea && detailsEl) {
-                saveSettings(textarea.value, detailsEl.open);
+            const checkbox = panel?.querySelector('#joyn-filter-hide-joyn-plus');
+            if (textarea && detailsEl && checkbox) {
+                saveSettings(textarea.value, detailsEl.open, checkbox.checked);
             }
         });
 
@@ -424,10 +485,12 @@
             const panel = document.getElementById('joyn-filter-panel');
             const textarea = panel?.querySelector('textarea');
             const detailsEl = panel?.querySelector('details');
-            if (textarea && detailsEl) {
+            const checkbox = panel?.querySelector('#joyn-filter-hide-joyn-plus');
+            if (textarea && detailsEl && checkbox) {
                 const freshSettings = loadSettings();
                 textarea.value = freshSettings.titlesText;
                 detailsEl.open = freshSettings.panelOpen;
+                checkbox.checked = freshSettings.hideJoynPlus;
                 applyFilters();
             }
         }};
