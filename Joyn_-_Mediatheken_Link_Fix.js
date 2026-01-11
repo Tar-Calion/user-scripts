@@ -44,8 +44,8 @@
         return LINK_MAPPINGS[normalized] || null;
     }
 
-    function addToList(originalHref, newHref) {
-        const entry = { original: originalHref, new: newHref };
+    function addToList(originalHref, newHref, imgSrc) {
+        const entry = { original: originalHref, new: newHref, imgSrc: imgSrc };
         if (!adjustedLinks.some(item => item.original === originalHref && item.new === newHref)) {
             adjustedLinks.push(entry);
             updateList();
@@ -63,7 +63,7 @@
         listContainer = document.createElement('div');
         listContainer.id = 'adjusted-links-container';
         listContainer.style.cssText = 'position: fixed; top: 10px; left: 10px; width: 1600px; max-height: 100vh; overflow-y: auto; background: rgba(30, 30, 30, 0.95); border: 1px solid #555; padding: 15px; border-radius: 5px; font-size: 12px; z-index: 99999; box-shadow: 0 2px 10px rgba(0,0,0,0.5); color: #fff;';
-        listContainer.innerHTML = '<strong style="display: block; margin-bottom: 10px; color: #fff;">Angepasste Links:</strong><ul id="adjusted-links-list" style="margin: 0; padding-left: 20px; list-style-type: disc;"></ul>';
+        listContainer.innerHTML = '<strong style="display: block; margin-bottom: 10px; color: #fff;">Angepasste Links:</strong><ul id="adjusted-links-list" style="margin: 0; padding: 0; list-style-type: none; display: flex; flex-wrap: wrap; gap: 5px;"></ul>';
         
         document.body.appendChild(listContainer);
     }
@@ -78,17 +78,31 @@
         list.innerHTML = '';
         for (const entry of adjustedLinks) {
             const li = document.createElement('li');
-            li.style.marginBottom = '10px';
+            li.style.marginBottom = '5px';
             li.style.wordBreak = 'break-all';
             li.style.color = '#fff';
+            li.style.display = 'inline-block';
+            li.style.marginRight = '5px';
             
             const link = document.createElement('a');
             link.href = entry.new;
             link.target = '_blank';
-            link.style.cssText = 'color: #4da6ff; text-decoration: none; word-break: break-all;';
-            link.textContent = entry.new;
-            link.onmouseover = function() { this.style.textDecoration = 'underline'; };
-            link.onmouseout = function() { this.style.textDecoration = 'none'; };
+            link.style.cssText = 'display: inline-block;';
+            link.title = entry.new;
+            
+            if (entry.imgSrc) {
+                const img = document.createElement('img');
+                img.src = entry.imgSrc;
+                img.style.cssText = 'width: 80px; height: auto; display: block; border-radius: 4px; transition: transform 0.2s;';
+                img.onmouseover = function() { this.style.transform = 'scale(1.1)'; };
+                img.onmouseout = function() { this.style.transform = 'scale(1)'; };
+                link.appendChild(img);
+            } else {
+                link.style.cssText += 'color: #4da6ff; text-decoration: none;';
+                link.textContent = entry.new;
+                link.onmouseover = function() { this.style.textDecoration = 'underline'; };
+                link.onmouseout = function() { this.style.textDecoration = 'none'; };
+            }
             
             li.appendChild(link);
             list.appendChild(li);
@@ -111,20 +125,24 @@
             const pathname = extractPathFromHref(href);
             if (!pathname) continue;
 
+            // Find icon image in the anchor
+            const img = anchor.querySelector('img');
+            const imgSrc = img ? img.src : null;
+
             // Check if there's a specific mapping for this path
             const mappedUrl = mapPath(pathname);
             if (mappedUrl) {
                 if (anchor.href !== mappedUrl) {
                     const oldHref = anchor.href;
                     anchor.href = mappedUrl;
-                    addToList(oldHref, mappedUrl);
+                    addToList(oldHref, mappedUrl, imgSrc);
                 }
             } else if (pathname.startsWith('/mediatheken/') || pathname.startsWith('/channels/')) {
                 // For all other /mediatheken/* and /channels/* links, add #alles if not already present
                 if (!href.includes('#alles') && !anchor.hash) {
                     const oldHref = anchor.href;
                     anchor.href = href + '#alles';
-                    addToList(oldHref, anchor.href);
+                    addToList(oldHref, anchor.href, imgSrc);
                 }
             }
         }
