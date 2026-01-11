@@ -4,6 +4,7 @@
 // @version      1.1
 // @description  Hide selected titles on Joyn mediathek lists with quick add buttons.
 // @match        https://www.joyn.de/*
+// @exclude      https://www.joyn.de/mediatheken
 // @match        https://joyn.de/*
 // @grant        none
 // ==/UserScript==
