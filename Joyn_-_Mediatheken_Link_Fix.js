@@ -130,7 +130,7 @@
         listContainer = document.createElement('div');
         listContainer.id = 'adjusted-links-container';
         listContainer.style.cssText = 'position: fixed; top: 10px; left: 10px; right: 10px; max-height: 90vh; overflow-y: auto; background: rgba(30, 30, 30, 0.95); border: 1px solid #555; padding: 15px; border-radius: 5px; font-size: 12px; z-index: 99999; box-shadow: 0 2px 10px rgba(0,0,0,0.5); color: #fff;';
-        listContainer.innerHTML = '<strong style="display: block; margin-bottom: 10px; color: #fff; font-size: 16px;">Angepasste Sender-Links (62):</strong><div id="adjusted-links-list" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 12px; margin: 0; padding: 0;"></div>';
+        listContainer.innerHTML = '<strong style="display: block; margin-bottom: 10px; color: #fff; font-size: 16px;">Angepasste Sender-Links:</strong><div id="adjusted-links-list" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 12px; margin: 0; padding: 0;"></div>';
         
         document.body.appendChild(listContainer);
     }
@@ -144,52 +144,58 @@
 
         list.innerHTML = '';
         for (const entry of adjustedLinks) {
+            // outer anchor makes the whole card clickable
+            const outerAnchor = document.createElement('a');
+            outerAnchor.href = entry.new;
+            outerAnchor.target = '_blank';
+            outerAnchor.style.cssText = 'text-decoration: none; color: inherit; display: block;';
+
             const card = document.createElement('div');
             card.style.cssText = 'display: flex; align-items: flex-start; gap: 12px; background: rgba(50, 50, 50, 0.8); padding: 10px; border-radius: 8px; border: 1px solid #444; transition: all 0.2s;';
-            card.onmouseover = function() { 
-                this.style.background = 'rgba(70, 70, 70, 0.9)'; 
+            card.setAttribute('role', 'link');
+            card.tabIndex = 0;
+            card.onmouseover = function() {
+                this.style.background = 'rgba(70, 70, 70, 0.9)';
                 this.style.borderColor = '#666';
             };
-            card.onmouseout = function() { 
-                this.style.background = 'rgba(50, 50, 50, 0.8)'; 
+            card.onmouseout = function() {
+                this.style.background = 'rgba(50, 50, 50, 0.8)';
                 this.style.borderColor = '#444';
             };
-            
-            const link = document.createElement('a');
-            link.href = entry.new;
-            link.target = '_blank';
-            link.style.cssText = 'flex-shrink: 0; display: block; line-height: 0;';
-            link.title = entry.new;
-            
+            card.onkeydown = function(e) {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    window.open(entry.new, '_blank');
+                    e.preventDefault();
+                }
+            };
+
+            // image (no nested anchor)
             if (entry.imgSrc) {
                 const img = document.createElement('img');
                 img.src = entry.imgSrc;
-                img.style.cssText = 'width: 80px; height: auto; display: block; border-radius: 4px; transition: transform 0.2s;';
-                link.appendChild(img);
+                img.alt = '';
+                img.style.cssText = 'width: 80px; height: auto; display: block; border-radius: 4px; transition: transform 0.2s; flex-shrink: 0;';
+                card.appendChild(img);
             }
-            
+
             const textContainer = document.createElement('div');
             textContainer.style.cssText = 'flex: 1; min-width: 0;';
-            
+
             if (entry.description) {
                 const descText = document.createElement('p');
                 descText.textContent = entry.description;
                 descText.style.cssText = 'margin: 0; color: #ddd; font-size: 11px; line-height: 1.4; overflow-wrap: break-word;';
                 textContainer.appendChild(descText);
             } else {
-                const urlText = document.createElement('a');
-                urlText.href = entry.new;
-                urlText.target = '_blank';
+                const urlText = document.createElement('span');
                 urlText.textContent = entry.new;
-                urlText.style.cssText = 'color: #4da6ff; text-decoration: none; font-size: 11px;';
-                urlText.onmouseover = function() { this.style.textDecoration = 'underline'; };
-                urlText.onmouseout = function() { this.style.textDecoration = 'none'; };
+                urlText.style.cssText = 'color: #4da6ff; font-size: 11px; word-break: break-all;';
                 textContainer.appendChild(urlText);
             }
-            
-            card.appendChild(link);
+
             card.appendChild(textContainer);
-            list.appendChild(card);
+            outerAnchor.appendChild(card);
+            list.appendChild(outerAnchor);
         }
     }
 
