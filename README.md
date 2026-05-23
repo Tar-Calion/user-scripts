@@ -32,15 +32,16 @@ Year extraction: If the page contains a meta description with the year in the fi
 
 Hides selected titles on https://www.joyn.de/ pages. Adds quick "Ausblenden" buttons on cards and stores the hidden-title list in localStorage.
 
-## Steam_-_Copy_to_Excel_Row.js
+## Game_Sites_-_Copy_to_Excel_Row.js
 
-Adds a fixed button (top-right) on Steam game pages (`store.steampowered.com/app/*`). Click it to copy a tab-separated row to the clipboard, ready to paste into Excel:
+Adds a copy button for Steam game pages (`store.steampowered.com/app/*`) and IndieGala freebies pages (`freebies.indiegala.com/*`). Click it to copy a tab-separated row to the clipboard, ready to paste into Excel:
 
 | Titel | Genre | Entwickler | Konten | Erwerbsdatum | Quelle | Preis |
 |---|---|---|---|---|---|---|
 | *(extracted)* | *(extracted, first genre)* | *(extracted)* | Steam | *(today DD.MM.YYYY)* | Steam Giveaway | 0 |
+| *(extracted)* | *(extracted, first category)* | *(blank)* | Indie Gala DL | *(today DD.MM.YYYY)* | Indie Gala Giveaway | 0 |
 
-The button turns green and shows ✅ on success, ❌ on failure.
+On Steam the button is placed next to the share button; on IndieGala it is placed right after the `Vote` link. The button shows ✅ on success and ❌ on failure.
 
 ## Joyn_-_Mediatheken_Link_Fix.js
 
@@ -48,4 +49,3 @@ Rewrites Mediatheken links on https://www.joyn.de/mediatheken:
 
 - Maps specific channels (SAT.1, ProSieben, Kabel Eins, sixx, SAT.1 Gold, ProSieben MAXX, Kabel Eins Doku) to their collection URLs
 - Appends `#alles` to all other `/mediatheken/*` and `/channels/*` links
-
