@@ -1,10 +1,11 @@
 // ==UserScript==
-// @name         Steam + IndieGala - Copy to Excel Row
+// @name         Game Sites - Copy to Excel Row
 // @namespace    https://github.com/Tar-Calion/user-scripts
-// @version      1.2
-// @description  Adds a button on Steam and IndieGala giveaway pages to copy game info as a tab-separated row for Excel (Titel, Genre, Entwickler, Konten, Erwerbsdatum, Quelle, Preis)
+// @version      1.3
+// @description  Adds a button on Steam, IndieGala and Itch.io game pages to copy game info as a tab-separated row for Excel (Titel, Genre, Entwickler, Konten, Erwerbsdatum, Quelle, Preis)
 // @match        https://store.steampowered.com/app/*
 // @match        https://freebies.indiegala.com/*
+// @match        https://*.itch.io/*
 // @grant        none
 // ==/UserScript==
 
@@ -83,6 +84,56 @@
         };
     }
 
+    function extractItchioData() {
+        const title = normalizeWhitespace(document.querySelector('.game_title')?.textContent ?? '');
+
+        let developer = '';
+        let genre = '';
+        const infoRows = Array.from(document.querySelectorAll('.game_info_panel_widget tr'));
+
+        for (const row of infoRows) {
+            const cells = row.querySelectorAll('td');
+            if (cells.length < 2) continue;
+
+            const label = normalizeWhitespace(cells[0].textContent);
+            const value = normalizeWhitespace(cells[1].textContent);
+
+            if (label === 'Author' && value) {
+                developer = value;
+            }
+
+            if (label === 'Genre' && value) {
+                genre = value;
+            }
+        }
+
+        document.querySelectorAll('script[type="application/ld+json"]').forEach((script) => {
+            try {
+                const data = JSON.parse(script.textContent);
+                if (!developer && data['@type'] === 'Product' && data.seller?.name) {
+                    developer = data.seller.name;
+                }
+                if (!genre && data['@type'] === 'BreadcrumbList') {
+                    const genreItem = data.itemListElement?.find((item) =>
+                        item.item?.['@id']?.includes('/games/genre-')
+                    );
+                    if (genreItem) genre = genreItem.item.name;
+                }
+            } catch (e) { /* malformed JSON-LD */ }
+        });
+
+        return {
+            title,
+            genre,
+            developer,
+            account: 'Itch.io DL',
+            date: getToday(),
+            source: 'Itch.io Giveaway',
+            price: '0',
+            logPrefix: 'Itch.io Excel'
+        };
+    }
+
     function extractData() {
         if (location.hostname === 'store.steampowered.com') {
             return extractSteamData();
@@ -90,6 +141,10 @@
 
         if (location.hostname === 'freebies.indiegala.com') {
             return extractIndieGalaData();
+        }
+
+        if (location.hostname.endsWith('.itch.io')) {
+            return extractItchioData();
         }
 
         return null;
@@ -162,6 +217,19 @@
         }
     }
 
+    function buildItchioButton(wrapper, btn, span) {
+        btn.className = 'button';
+        span.textContent = '📋 Excel';
+
+        const buyMessage = document.querySelector('.buy_message');
+        if (buyMessage) {
+            buyMessage.insertAdjacentElement('afterend', wrapper);
+        } else {
+            wrapper.style.cssText = 'position:fixed;top:12px;right:12px;z-index:9999;';
+            document.body.appendChild(wrapper);
+        }
+    }
+
     function createButton() {
         if (document.getElementById('copy_excel_row_btn')) return;
 
@@ -200,6 +268,8 @@
             buildSteamButton(wrapper, btn, span);
         } else if (location.hostname === 'freebies.indiegala.com') {
             buildIndieGalaButton(wrapper, btn, span);
+        } else if (location.hostname.endsWith('.itch.io')) {
+            buildItchioButton(wrapper, btn, span);
         } else {
             wrapper.style.cssText = 'position:fixed;top:12px;right:12px;z-index:9999;';
             document.body.appendChild(wrapper);

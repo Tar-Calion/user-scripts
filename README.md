@@ -34,14 +34,15 @@ Hides selected titles on https://www.joyn.de/ pages. Adds quick "Ausblenden" but
 
 ## Game_Sites_-_Copy_to_Excel_Row.js
 
-Adds a copy button for Steam game pages (`store.steampowered.com/app/*`) and IndieGala freebies pages (`freebies.indiegala.com/*`). Click it to copy a tab-separated row to the clipboard, ready to paste into Excel:
+Adds a copy button for Steam game pages (`store.steampowered.com/app/*`), IndieGala freebies pages (`freebies.indiegala.com/*`) and Itch.io game pages (`*.itch.io/*`). Click it to copy a tab-separated row to the clipboard, ready to paste into Excel:
 
 | Titel | Genre | Entwickler | Konten | Erwerbsdatum | Quelle | Preis |
 |---|---|---|---|---|---|---|
 | *(extracted)* | *(extracted, first genre)* | *(extracted)* | Steam | *(today DD.MM.YYYY)* | Steam Giveaway | 0 |
 | *(extracted)* | *(extracted, first category)* | *(blank)* | Indie Gala DL | *(today DD.MM.YYYY)* | Indie Gala Giveaway | 0 |
+| *(extracted)* | *(extracted from Genre row)* | *(extracted from Author row)* | Itch.io DL | *(today DD.MM.YYYY)* | Itch.io Giveaway | 0 |
 
-On Steam the button is placed next to the share button; on IndieGala it is placed right after the `Vote` link. The button shows ✅ on success and ❌ on failure.
+On Steam the button is placed next to the share button; on IndieGala after the `Vote` link; on Itch.io after the price/`buy_message` element. The button shows ✅ on success and ❌ on failure.
 
 ## Joyn_-_Mediatheken_Link_Fix.js
 
