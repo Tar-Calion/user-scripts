@@ -1,11 +1,12 @@
 // ==UserScript==
 // @name         Game Sites - Copy to Excel Row
 // @namespace    https://github.com/Tar-Calion/user-scripts
-// @version      1.3
-// @description  Adds a button on Steam, IndieGala and Itch.io game pages to copy game info as a tab-separated row for Excel (Titel, Genre, Entwickler, Konten, Erwerbsdatum, Quelle, Preis)
+// @version      1.4
+// @description  Adds a button on Steam, IndieGala, Itch.io and Epic Games Store game pages to copy game info as a tab-separated row for Excel (Titel, Genre, Entwickler, Konten, Erwerbsdatum, Quelle, Preis)
 // @match        https://store.steampowered.com/app/*
 // @match        https://freebies.indiegala.com/*
 // @match        https://*.itch.io/*
+// @match        https://store.epicgames.com/p/*
 // @grant        none
 // ==/UserScript==
 
@@ -134,6 +135,23 @@
         };
     }
 
+    function extractEpicData() {
+        const title = normalizeWhitespace(document.querySelector('[data-testid="pdp-title"]')?.textContent ?? '');
+        const genre = normalizeWhitespace(document.querySelector('[data-testid="about-metadata-layout-column"] a[href*="/browse?tag="]')?.textContent ?? '');
+        const developer = normalizeWhitespace(document.querySelector('[data-testid="metadata-developer-single"]')?.textContent ?? '');
+
+        return {
+            title,
+            genre,
+            developer,
+            account: 'Epic',
+            date: getToday(),
+            source: 'Epic Giveaway',
+            price: '0',
+            logPrefix: 'Epic Excel'
+        };
+    }
+
     function extractData() {
         if (location.hostname === 'store.steampowered.com') {
             return extractSteamData();
@@ -145,6 +163,10 @@
 
         if (location.hostname.endsWith('.itch.io')) {
             return extractItchioData();
+        }
+
+        if (location.hostname === 'store.epicgames.com') {
+            return extractEpicData();
         }
 
         return null;
@@ -230,6 +252,19 @@
         }
     }
 
+    function buildEpicButton(wrapper, btn, span) {
+        btn.style.cssText = 'display:inline-block;padding:4px 10px;margin-top:8px;cursor:pointer;color:#fff;background:#0078f2;border-radius:4px;font-size:13px;';
+        span.textContent = '📋 Excel';
+
+        const h1 = document.querySelector('[data-testid="pdp-title"]')?.closest('h1');
+        if (h1) {
+            h1.insertAdjacentElement('afterend', wrapper);
+        } else {
+            wrapper.style.cssText = 'position:fixed;top:12px;right:12px;z-index:9999;';
+            document.body.appendChild(wrapper);
+        }
+    }
+
     function createButton() {
         if (document.getElementById('copy_excel_row_btn')) return;
 
@@ -270,6 +305,8 @@
             buildIndieGalaButton(wrapper, btn, span);
         } else if (location.hostname.endsWith('.itch.io')) {
             buildItchioButton(wrapper, btn, span);
+        } else if (location.hostname === 'store.epicgames.com') {
+            buildEpicButton(wrapper, btn, span);
         } else {
             wrapper.style.cssText = 'position:fixed;top:12px;right:12px;z-index:9999;';
             document.body.appendChild(wrapper);
