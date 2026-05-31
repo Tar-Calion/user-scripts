@@ -4,6 +4,7 @@
 // @version      1.0
 // @description  Link ISBNs on OpenLibrary to Wikipedia BookSources
 // @match        https://openlibrary.org/books/*
+// @match        https://openlibrary.org/works/*
 // @grant        none
 // ==/UserScript==
 
