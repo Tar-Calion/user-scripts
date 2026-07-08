@@ -1,12 +1,14 @@
 // ==UserScript==
 // @name         Game Sites - Copy to Excel Row
 // @namespace    https://github.com/Tar-Calion/user-scripts
-// @version      1.4
-// @description  Adds a button on Steam, IndieGala, Itch.io and Epic Games Store game pages to copy game info as a tab-separated row for Excel (Titel, Genre, Entwickler, Konten, Erwerbsdatum, Quelle, Preis)
+// @version      1.5
+// @description  Adds a button on Steam, IndieGala, Itch.io, Epic Games Store and GOG game pages to copy game info as a tab-separated row for Excel (Titel, Genre, Entwickler, Konten, Erwerbsdatum, Quelle, Preis)
 // @match        https://store.steampowered.com/app/*
 // @match        https://freebies.indiegala.com/*
 // @match        https://*.itch.io/*
 // @match        https://store.epicgames.com/p/*
+// @match        https://www.gog.com/game/*
+// @match        https://www.gog.com/*/game/*
 // @grant        none
 // ==/UserScript==
 
@@ -152,6 +154,35 @@
         };
     }
 
+    function getGogDetailsRow(label) {
+        return Array.from(document.querySelectorAll('.details__row, .table__row')).find((row) => {
+            const category = normalizeWhitespace(row.querySelector('.details__category, .table__row-label')?.textContent ?? '');
+            return category.replace(/:$/, '') === label;
+        });
+    }
+
+    function extractGogData() {
+        const title = normalizeWhitespace(document.querySelector('[selenium-id="ProductTitle"], .productcard-basics__title')?.textContent ?? '');
+        const genre = normalizeWhitespace(document.querySelector('.genres__item, [selenium-id="ProductGenres"] .details__link')?.textContent ?? '');
+        const companyRow = getGogDetailsRow('Company');
+        const developer = normalizeWhitespace(
+            document.querySelector('a[gog-track-event*="Developer:"]')?.textContent
+            ?? companyRow?.querySelector('.details__content a, .table__row-content a')?.textContent
+            ?? ''
+        );
+
+        return {
+            title,
+            genre,
+            developer,
+            account: 'GOG',
+            date: getToday(),
+            source: 'GOG Giveaway',
+            price: '0',
+            logPrefix: 'GOG Excel'
+        };
+    }
+
     function extractData() {
         if (location.hostname === 'store.steampowered.com') {
             return extractSteamData();
@@ -167,6 +198,10 @@
 
         if (location.hostname === 'store.epicgames.com') {
             return extractEpicData();
+        }
+
+        if (location.hostname === 'www.gog.com' && location.pathname.includes('/game/')) {
+            return extractGogData();
         }
 
         return null;
@@ -265,6 +300,19 @@
         }
     }
 
+    function buildGogButton(wrapper, btn, span) {
+        btn.style.cssText = 'display:inline-block;padding:5px 12px;margin-top:10px;cursor:pointer;color:#fff;background:#78387b;border-radius:4px;font-size:13px;font-weight:600;text-decoration:none;';
+        span.textContent = '📋 Excel';
+
+        const title = document.querySelector('[selenium-id="ProductTitle"], .productcard-basics__title');
+        if (title) {
+            title.insertAdjacentElement('afterend', wrapper);
+        } else {
+            wrapper.style.cssText = 'position:fixed;top:12px;right:12px;z-index:9999;';
+            document.body.appendChild(wrapper);
+        }
+    }
+
     function createButton() {
         if (document.getElementById('copy_excel_row_btn')) return;
 
@@ -307,6 +355,8 @@
             buildItchioButton(wrapper, btn, span);
         } else if (location.hostname === 'store.epicgames.com') {
             buildEpicButton(wrapper, btn, span);
+        } else if (location.hostname === 'www.gog.com' && location.pathname.includes('/game/')) {
+            buildGogButton(wrapper, btn, span);
         } else {
             wrapper.style.cssText = 'position:fixed;top:12px;right:12px;z-index:9999;';
             document.body.appendChild(wrapper);
